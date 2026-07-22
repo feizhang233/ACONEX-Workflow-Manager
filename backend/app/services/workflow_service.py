@@ -660,7 +660,8 @@ def _apply_comment_to_steps(db: Session, workflow_number: str, fields: dict[str,
             matched = True
     if not matched and steps:
         # Prefer highest step index
-        target = sorted(steps, key=lambda s: (s.step_index is None, s.step_index or 0))[-1]
+        indexed_steps = [step for step in steps if step.step_index is not None]
+        target = max(indexed_steps, key=lambda step: step.step_index or 0) if indexed_steps else steps[-1]
         target.final_mail_comment = comment
         target.sheet_sync_status = "pending"
         db.add(target)

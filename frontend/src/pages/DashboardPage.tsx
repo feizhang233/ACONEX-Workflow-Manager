@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { api, type DashboardStats, type UpdateRun, ApiError } from "../api/client";
+import { api, apiUrl, type DashboardStats, type UpdateRun, ApiError } from "../api/client";
 import { Alert } from "../components/Alert";
 
 const ACTIONS = [
@@ -40,7 +40,7 @@ export function DashboardPage() {
 
   useEffect(() => {
     if (!activeId || activeStatus !== "running") return;
-    const es = new EventSource(`/api/runs/${activeId}/events`);
+    const es = new EventSource(apiUrl(`/api/runs/${activeId}/events`));
     es.onmessage = (ev) => {
       try {
         const data = JSON.parse(ev.data) as {

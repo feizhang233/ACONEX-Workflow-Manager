@@ -9,7 +9,7 @@ import pytest
 from app.services.aconex.auth import AconexAuthService
 from app.services.encryption import encrypt_value, decrypt_value, mask_secret
 from app.services.feedback_service import ensure_default_rule, rule_matches_step, create_rule
-from app.services.workflow_service import add_tracked_numbers, upsert_workflow_steps
+from app.services.workflow_service import add_tracked_numbers, upsert_comment, upsert_workflow_steps
 from app.services.aconex.xml_utils import parse_workflow_xml
 from app.services.google_sheets_service import GoogleSheetsGateway, sync_to_sheets
 from app.models.entities import WorkflowStep
@@ -145,6 +145,39 @@ def test_upsert_workflow_steps_and_history(db_session):
     assert any(h.change_type in {"status", "new"} for h in history)
 
 
+def test_final_mail_fallback_prefers_highest_numbered_step(db_session):
+    page = parse_workflow_xml(SAMPLE_WORKFLOW_XML)
+    upsert_workflow_steps(db_session, page.steps, source="test")
+
+    from app.models.entities import Workflow
+
+    workflow = db_session.query(Workflow).filter(Workflow.workflow_number == "WF-800").one()
+    unnumbered = WorkflowStep(
+        workflow_pk=workflow.id,
+        workflow_id=workflow.workflow_id,
+        workflow_number=workflow.workflow_number,
+        step_index=None,
+        step_name="Unnumbered metadata step",
+    )
+    db_session.add(unnumbered)
+    db_session.commit()
+
+    changed = upsert_comment(
+        db_session,
+        {
+            "workflow_number": "WF-800",
+            "mail_id": "fallback-mail",
+            "comment_text": "Final review comment",
+        },
+    )
+
+    assert changed is True
+    steps = db_session.query(WorkflowStep).filter(WorkflowStep.workflow_number == "WF-800").all()
+    commented = [step for step in steps if step.final_mail_comment == "Final review comment"]
+    assert len(commented) == 1
+    assert commented[0].step_index == 2
+
+
 def test_sync_with_mock_aconex(db_session):
     """Sync pipeline services with mocked ACONEX client (no real network)."""
 
@@ -275,6 +308,41 @@ def test_scheduled_job_api(client):
     client.put(f"/api/scheduled-jobs/{job_id}", json={"enabled": False})
     client.delete(f"/api/scheduled-jobs/{job_id}")
     assert client.get("/api/scheduled-jobs").json() == []
+
+
+def test_scheduled_job_rejects_invalid_values_without_persisting(client):
+    invalid_create = client.post(
+        "/api/scheduled-jobs",
+        json={
+            "name": "Invalid cron",
+            "schedule_type": "cron",
+            "cron_expression": "not-a-five-field-cron",
+            "job_type": "pipeline",
+        },
+    )
+    assert invalid_create.status_code == 422
+    assert client.get("/api/scheduled-jobs").json() == []
+
+    created = client.post(
+        "/api/scheduled-jobs",
+        json={
+            "name": "Valid daily job",
+            "schedule_type": "daily",
+            "daily_time": "10:00",
+            "job_type": "pipeline",
+        },
+    )
+    assert created.status_code == 200
+    job_id = created.json()["id"]
+
+    invalid_update = client.put(
+        f"/api/scheduled-jobs/{job_id}",
+        json={"daily_time": "25:99", "job_type": "unknown"},
+    )
+    assert invalid_update.status_code == 422
+    stored = client.get("/api/scheduled-jobs").json()[0]
+    assert stored["daily_time"] == "10:00"
+    assert stored["job_type"] == "pipeline"
 
 
 def test_dashboard(client):

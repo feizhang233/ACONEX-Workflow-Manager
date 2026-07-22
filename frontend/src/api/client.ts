@@ -2,6 +2,10 @@
 
 const API_BASE = import.meta.env.VITE_API_BASE || "";
 
+export function apiUrl(path: string): string {
+  return `${API_BASE}${path}`;
+}
+
 export class ApiError extends Error {
   status: number;
   detail: unknown;
@@ -20,18 +24,21 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   if (options.body && !headers["Content-Type"]) {
     headers["Content-Type"] = "application/json";
   }
-  const res = await fetch(`${API_BASE}${path}`, { ...options, headers });
+  const res = await fetch(apiUrl(path), { ...options, headers });
   if (!res.ok) {
-    let detail: unknown = null;
+    const responseText = await res.text();
+    let detail: unknown = responseText;
     try {
-      detail = await res.json();
+      detail = responseText ? JSON.parse(responseText) : null;
     } catch {
-      detail = await res.text();
+      // Keep plain-text and HTML errors intact (for example, proxy errors).
     }
     const msg =
       typeof detail === "object" && detail && "detail" in detail
         ? String((detail as { detail: unknown }).detail)
-        : res.statusText;
+        : typeof detail === "string" && detail
+          ? detail
+          : res.statusText;
     throw new ApiError(msg || `HTTP ${res.status}`, res.status, detail);
   }
   if (res.status === 204) return undefined as T;

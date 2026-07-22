@@ -98,10 +98,11 @@ def build_trigger(job: ScheduledJob):
 
 
 def _parse_hhmm(value: str) -> tuple[int, int]:
-    parts = (value or "10:00").strip().split(":")
-    hour = int(parts[0])
-    minute = int(parts[1]) if len(parts) > 1 else 0
-    return hour % 24, minute % 60
+    try:
+        parsed = datetime.strptime((value or "10:00").strip(), "%H:%M")
+    except ValueError as exc:
+        raise ValueError(f"Invalid daily_time: {value!r}; expected HH:MM") from exc
+    return parsed.hour, parsed.minute
 
 
 def register_job(job: ScheduledJob) -> None:
@@ -172,6 +173,8 @@ def create_scheduled_job(db: Session, data: dict[str, Any]) -> ScheduledJob:
         job_type=data.get("job_type") or "pipeline",
         job_params_json=json.dumps(data.get("job_params") or {}),
     )
+    # Validate before committing so a rejected schedule cannot remain in the DB.
+    build_trigger(job)
     db.add(job)
     db.commit()
     db.refresh(job)
@@ -200,6 +203,8 @@ def update_scheduled_job(db: Session, job_id: int, data: dict[str, Any]) -> Sche
     if "job_params" in data and data["job_params"] is not None:
         job.job_params_json = json.dumps(data["job_params"])
     job.updated_at = utc_now()
+    # Validate the complete merged row before committing the update.
+    build_trigger(job)
     db.add(job)
     db.commit()
     db.refresh(job)

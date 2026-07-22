@@ -8,6 +8,41 @@ from typing import Any
 from pydantic import BaseModel, Field, field_validator
 
 
+SCHEDULE_TYPES = {"interval_minutes", "interval_hours", "daily", "weekly", "cron"}
+JOB_TYPES = {
+    "pipeline",
+    "sync_tracked",
+    "sync_current",
+    "fetch_comments",
+    "sync_sheets",
+}
+
+
+def _validate_daily_time(value: str | None) -> str | None:
+    if value is None:
+        return None
+    try:
+        datetime.strptime(value, "%H:%M")
+    except ValueError as exc:
+        raise ValueError("daily_time must use HH:MM with a valid 24-hour time") from exc
+    return value
+
+
+def _validate_weekdays(value: list[int] | None) -> list[int] | None:
+    if value is not None and any(day < 0 or day > 6 for day in value):
+        raise ValueError("weekdays must contain values from 0 (Monday) to 6 (Sunday)")
+    return value
+
+
+def _validate_cron(value: str | None) -> str | None:
+    if value is None:
+        return None
+    value = value.strip()
+    if len(value.split()) != 5:
+        raise ValueError("cron_expression must contain 5 fields")
+    return value
+
+
 class ScheduledJobCreate(BaseModel):
     name: str = Field(min_length=1, max_length=128)
     enabled: bool = True
@@ -23,37 +58,51 @@ class ScheduledJobCreate(BaseModel):
     @field_validator("schedule_type")
     @classmethod
     def validate_schedule_type(cls, v: str) -> str:
-        allowed = {"interval_minutes", "interval_hours", "daily", "weekly", "cron"}
-        if v not in allowed:
-            raise ValueError(f"schedule_type must be one of {allowed}")
+        if v not in SCHEDULE_TYPES:
+            raise ValueError(f"schedule_type must be one of {SCHEDULE_TYPES}")
         return v
 
     @field_validator("job_type")
     @classmethod
     def validate_job_type(cls, v: str) -> str:
-        allowed = {
-            "pipeline",
-            "sync_tracked",
-            "sync_current",
-            "fetch_comments",
-            "sync_sheets",
-        }
-        if v not in allowed:
-            raise ValueError(f"job_type must be one of {allowed}")
+        if v not in JOB_TYPES:
+            raise ValueError(f"job_type must be one of {JOB_TYPES}")
         return v
+
+    _daily_time = field_validator("daily_time")(_validate_daily_time)
+    _weekdays = field_validator("weekdays")(_validate_weekdays)
+    _cron_expression = field_validator("cron_expression")(_validate_cron)
 
 
 class ScheduledJobUpdate(BaseModel):
-    name: str | None = None
+    name: str | None = Field(default=None, min_length=1, max_length=128)
     enabled: bool | None = None
     schedule_type: str | None = None
-    interval_value: int | None = None
+    interval_value: int | None = Field(default=None, ge=1)
     daily_time: str | None = None
     weekdays: list[int] | None = None
     cron_expression: str | None = None
     timezone: str | None = None
     job_type: str | None = None
     job_params: dict[str, Any] | None = None
+
+    @field_validator("schedule_type")
+    @classmethod
+    def validate_schedule_type(cls, v: str | None) -> str | None:
+        if v is not None and v not in SCHEDULE_TYPES:
+            raise ValueError(f"schedule_type must be one of {SCHEDULE_TYPES}")
+        return v
+
+    @field_validator("job_type")
+    @classmethod
+    def validate_job_type(cls, v: str | None) -> str | None:
+        if v is not None and v not in JOB_TYPES:
+            raise ValueError(f"job_type must be one of {JOB_TYPES}")
+        return v
+
+    _daily_time = field_validator("daily_time")(_validate_daily_time)
+    _weekdays = field_validator("weekdays")(_validate_weekdays)
+    _cron_expression = field_validator("cron_expression")(_validate_cron)
 
 
 class ScheduledJobOut(BaseModel):
