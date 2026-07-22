@@ -3,11 +3,11 @@ import { api, type DashboardStats, type UpdateRun, ApiError } from "../api/clien
 import { Alert } from "../components/Alert";
 
 const ACTIONS = [
-  { action: "sync_tracked", label: "同步指定 Workflow" },
-  { action: "sync_current", label: "同步 Current Workflow" },
-  { action: "fetch_comments", label: "获取 Final Mail 评论" },
-  { action: "sync_sheets", label: "同步 Google Sheets" },
-  { action: "pipeline", label: "运行完整 Pipeline" },
+  { action: "sync_tracked", label: "Sync Tracked Workflows", icon: "sync" },
+  { action: "sync_current", label: "Sync Current Workflows", icon: "update" },
+  { action: "fetch_comments", label: "Fetch Final Mail Comments", icon: "mail" },
+  { action: "sync_sheets", label: "Sync Google Sheets", icon: "table_chart" },
+  { action: "pipeline", label: "Run Full Pipeline", icon: "play_arrow" },
 ] as const;
 
 export function DashboardPage() {
@@ -61,7 +61,11 @@ export function DashboardPage() {
         if (data.type === "progress") {
           setActive((prev) =>
             prev
-              ? { ...prev, progress_pct: data.progress_pct ?? prev.progress_pct, current_stage: data.stage ?? prev.current_stage }
+              ? {
+                  ...prev,
+                  progress_pct: data.progress_pct ?? prev.progress_pct,
+                  current_stage: data.stage ?? prev.current_stage,
+                }
               : prev,
           );
         }
@@ -98,86 +102,126 @@ export function DashboardPage() {
   }
 
   return (
-    <div>
-      <h1 className="page-title">Dashboard</h1>
-      <p className="page-sub">手动运行同步任务，查看系统状态与实时进度。</p>
+    <div className="page">
+      <header className="page-header">
+        <h1 className="page-title">Dashboard</h1>
+        <p className="page-sub">Run sync jobs manually and monitor system status with live progress.</p>
+      </header>
+
       <Alert type="error">{error}</Alert>
       <Alert type="success">{msg}</Alert>
 
-      <div className="grid stats" style={{ marginBottom: "1rem" }}>
-        <div className="card">
+      <div className="grid stats">
+        <div className="stat-card">
+          <div className="stat-icon">
+            <span className="material-symbols-outlined">track_changes</span>
+          </div>
           <div className="stat-value">{stats?.tracked_enabled ?? "—"}</div>
-          <div className="stat-label">启用追踪</div>
+          <div className="stat-label">Enabled Tracking</div>
         </div>
-        <div className="card">
+        <div className="stat-card">
+          <div className="stat-icon">
+            <span className="material-symbols-outlined">pending_actions</span>
+          </div>
           <div className="stat-value">{stats?.current_count ?? "—"}</div>
-          <div className="stat-label">进行中 Workflow</div>
+          <div className="stat-label">In-progress Workflows</div>
         </div>
-        <div className="card">
+        <div className="stat-card">
+          <div className="stat-icon">
+            <span className="material-symbols-outlined">cloud_upload</span>
+          </div>
           <div className="stat-value">{stats?.pending_sheet_sync ?? "—"}</div>
-          <div className="stat-label">待 Sheets 同步</div>
+          <div className="stat-label">Pending Sheet Sync</div>
         </div>
-        <div className="card">
+        <div className="stat-card">
+          <div className="stat-icon">
+            <span className="material-symbols-outlined">error</span>
+          </div>
           <div className="stat-value">{stats?.failed_sheet_sync ?? "—"}</div>
-          <div className="stat-label">Sheets 失败</div>
+          <div className="stat-label">Sheet Sync Failures</div>
         </div>
-        <div className="card">
+        <div className="stat-card">
+          <div className="stat-icon">
+            <span className="material-symbols-outlined">vpn_key</span>
+          </div>
           <div className="stat-value">
             <span className={`badge ${stats?.aconex_configured ? "ok" : "warn"}`}>
-              {stats?.aconex_configured ? "已配置" : "未配置"}
+              {stats?.aconex_configured ? "Configured" : "Not set"}
             </span>
           </div>
           <div className="stat-label">ACONEX</div>
         </div>
-        <div className="card">
+        <div className="stat-card">
+          <div className="stat-icon">
+            <span className="material-symbols-outlined">table_chart</span>
+          </div>
           <div className="stat-value">
             <span className={`badge ${stats?.sheets_configured ? "ok" : "warn"}`}>
-              {stats?.sheets_configured ? "已配置" : "未配置"}
+              {stats?.sheets_configured ? "Configured" : "Not set"}
             </span>
           </div>
           <div className="stat-label">Google Sheets</div>
         </div>
       </div>
 
-      <div className="card" style={{ marginBottom: "1rem" }}>
-        <h3>手动运行</h3>
-        <div className="row">
+      <div className="card">
+        <h3>
+          <span className="material-symbols-outlined">bolt</span>
+          Manual Run
+        </h3>
+        <div className="action-grid">
           {ACTIONS.map((a) => (
             <button
               key={a.action}
-              className="btn"
+              className={`btn ${a.action === "pipeline" ? "" : "secondary"}`}
               disabled={busy !== null || active?.status === "running"}
               onClick={() => void runAction(a.action)}
             >
-              {busy === a.action ? "启动中…" : a.label}
+              <span className="material-symbols-outlined">{a.icon}</span>
+              {busy === a.action ? "Starting…" : a.label}
             </button>
           ))}
         </div>
       </div>
 
       {(active || stats?.last_run) && (
-        <div className="card">
-          <h3>运行进度 {active ? `#${active.id}` : stats?.last_run ? `#${stats.last_run.id}` : ""}</h3>
+        <div className="card stack">
+          <div className="card-header">
+            <h3>
+              <span className="material-symbols-outlined">monitoring</span>
+              Run Progress {active ? `#${active.id}` : stats?.last_run ? `#${stats.last_run.id}` : ""}
+            </h3>
+            {active && (
+              <span
+                className={`badge ${
+                  active.status === "running" ? "warn" : active.status === "success" ? "ok" : "err"
+                }`}
+              >
+                {active.status}
+              </span>
+            )}
+          </div>
+
           {active && (
             <>
-              <div className="row" style={{ marginBottom: "0.5rem" }}>
-                <span className={`badge ${active.status === "running" ? "warn" : active.status === "success" ? "ok" : "err"}`}>
-                  {active.status}
-                </span>
-                <span className="muted">{active.current_stage}</span>
-                <span className="muted">{active.progress_pct?.toFixed?.(0) ?? 0}%</span>
+              <div className="status-line">
+                <div className="meta-pills">
+                  <span className="muted">{active.current_stage || "—"}</span>
+                  <span className="badge">{active.progress_pct?.toFixed?.(0) ?? 0}%</span>
+                </div>
+                <div className="muted mono">
+                  checked={active.checked_count} · updated={active.updated_count} · failed=
+                  {active.failed_count} · sheets={active.sheet_synced_count}
+                </div>
               </div>
-              <div className="progress" style={{ marginBottom: "0.75rem" }}>
+              <div className="progress">
                 <span style={{ width: `${active.progress_pct || 0}%` }} />
-              </div>
-              <div className="muted" style={{ marginBottom: "0.5rem" }}>
-                checked={active.checked_count} updated={active.updated_count} failed={active.failed_count} sheets=
-                {active.sheet_synced_count}
               </div>
             </>
           )}
+
           <div className="log-box">
-            {logs.length === 0 && <div className="muted">暂无日志</div>}
+            {logs.length === 0 && <div className="muted">No logs yet</div>}
             {logs.map((line, i) => (
               <div key={i} className={line.includes("[ERROR]") ? "ERROR" : ""}>
                 {line}

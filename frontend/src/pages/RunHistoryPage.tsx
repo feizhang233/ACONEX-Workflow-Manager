@@ -38,7 +38,7 @@ export function RunHistoryPage() {
     setMsg("");
     try {
       const res = await api.post<{ run_id: number }>(`/api/runs/${id}/retry`);
-      setMsg(`已启动重试 run #${res.run_id}`);
+      setMsg(`Retry started as run #${res.run_id}`);
       await load();
     } catch (e) {
       setError(e instanceof ApiError ? e.message : String(e));
@@ -46,30 +46,42 @@ export function RunHistoryPage() {
   }
 
   return (
-    <div>
-      <h1 className="page-title">运行历史</h1>
-      <p className="page-sub">查看每次任务的阶段日志、计数与错误，可重试失败任务。共 {total} 条。</p>
+    <div className="page">
+      <header className="page-header">
+        <h1 className="page-title">Run History</h1>
+        <p className="page-sub">
+          Review stage logs, counters, and errors for each job. Failed runs can be retried. Total: {total}.
+        </p>
+      </header>
+
       <Alert type="error">{error}</Alert>
       <Alert type="success">{msg}</Alert>
 
-      <div className="card" style={{ marginBottom: "1rem" }}>
+      <div className="card">
+        <div className="card-header">
+          <h3>
+            <span className="material-symbols-outlined">history</span>
+            Runs
+          </h3>
+          <span className="badge">{items.length}</span>
+        </div>
         <div className="table-wrap">
           <table>
             <thead>
               <tr>
                 <th>ID</th>
-                <th>命令</th>
-                <th>状态</th>
-                <th>开始</th>
-                <th>结束</th>
-                <th>计数</th>
-                <th></th>
+                <th>Command</th>
+                <th>Status</th>
+                <th>Started</th>
+                <th>Finished</th>
+                <th>Counts</th>
+                <th className="center">Actions</th>
               </tr>
             </thead>
             <tbody>
               {items.map((r) => (
                 <tr key={r.id}>
-                  <td>{r.id}</td>
+                  <td className="mono">{r.id}</td>
                   <td>
                     {r.command}
                     <div className="muted">{r.triggered_by}</div>
@@ -85,33 +97,48 @@ export function RunHistoryPage() {
                   </td>
                   <td className="mono">{r.started_at}</td>
                   <td className="mono">{r.finished_at || "—"}</td>
-                  <td className="muted">
+                  <td className="muted mono">
                     c={r.checked_count} u={r.updated_count} f={r.failed_count} s={r.sheet_synced_count}
                   </td>
-                  <td className="row">
-                    <button className="btn sm secondary" onClick={() => void openRun(r.id)}>
-                      详情
-                    </button>
-                    {r.status === "failed" && (
-                      <button className="btn sm" onClick={() => void retry(r.id)}>
-                        重试
+                  <td className="center">
+                    <div className="row center">
+                      <button className="btn sm secondary" onClick={() => void openRun(r.id)}>
+                        Details
                       </button>
-                    )}
+                      {r.status === "failed" && (
+                        <button className="btn sm" onClick={() => void retry(r.id)}>
+                          Retry
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}
+              {items.length === 0 && (
+                <tr>
+                  <td colSpan={7} className="empty-cell">
+                    No runs yet
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
       </div>
 
       {selected && (
-        <div className="card">
-          <h3>
-            Run #{selected.id} — {selected.command}
-          </h3>
+        <div className="card stack">
+          <div className="card-header">
+            <h3>
+              <span className="material-symbols-outlined">terminal</span>
+              Run #{selected.id} — {selected.command}
+            </h3>
+            <button className="btn sm secondary" onClick={() => setSelected(null)}>
+              Close
+            </button>
+          </div>
           {selected.error_message && <Alert type="error">{selected.error_message}</Alert>}
-          <div className="progress" style={{ marginBottom: "0.75rem" }}>
+          <div className="progress">
             <span style={{ width: `${selected.progress_pct || 0}%` }} />
           </div>
           <div className="log-box">
@@ -120,7 +147,7 @@ export function RunHistoryPage() {
                 [{l.timestamp}] [{l.level}] {l.stage}: {l.message}
               </div>
             ))}
-            {(selected.logs || []).length === 0 && <div>无日志</div>}
+            {(selected.logs || []).length === 0 && <div>No logs</div>}
           </div>
         </div>
       )}

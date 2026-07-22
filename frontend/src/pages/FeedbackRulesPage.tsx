@@ -1,24 +1,45 @@
 import { useEffect, useState } from "react";
 import { api, type FeedbackRule, ApiError } from "../api/client";
 import { Alert } from "../components/Alert";
+import { Switch } from "../components/Switch";
 
-const STATUS_OPTS = ["Pending", "A", "B", "C", "Completed", "Terminated"];
-const TRIGGER_OPTS = ["always", "data_changed", "pending_to_final", "overdue", "workflow_completed"];
-const FIELD_OPTS = [
-  "workflow_number",
-  "workflow_title",
-  "step_index",
-  "step_name",
-  "step_status",
-  "step_outcome",
-  "participant",
-  "date_due",
-  "date_completed",
-  "overdue",
-  "final_mail_comment",
-  "review_status",
-  "review_outcome",
+/** Stored API values remain short codes; UI shows full labels. */
+const STATUS_OPTS: { value: string; label: string }[] = [
+  { value: "Pending", label: "Pending" },
+  { value: "A", label: "A — Approved" },
+  { value: "B", label: "B — Approved with Comments" },
+  { value: "C", label: "C — Rejected" },
+  { value: "Completed", label: "Completed" },
+  { value: "Terminated", label: "Terminated" },
 ];
+
+const TRIGGER_OPTS: { value: string; label: string }[] = [
+  { value: "always", label: "Always" },
+  { value: "data_changed", label: "Data changed" },
+  { value: "pending_to_final", label: "Pending → Final" },
+  { value: "overdue", label: "Overdue" },
+  { value: "workflow_completed", label: "Workflow completed" },
+];
+
+const FIELD_OPTS: { value: string; label: string }[] = [
+  { value: "workflow_number", label: "Workflow number" },
+  { value: "workflow_title", label: "Workflow title" },
+  { value: "step_index", label: "Step index" },
+  { value: "step_name", label: "Step name" },
+  { value: "step_status", label: "Step status" },
+  { value: "step_outcome", label: "Step outcome" },
+  { value: "participant", label: "Participant" },
+  { value: "date_due", label: "Date due" },
+  { value: "date_completed", label: "Date completed" },
+  { value: "overdue", label: "Overdue" },
+  { value: "final_mail_comment", label: "Final mail comment" },
+  { value: "review_status", label: "Review status" },
+  { value: "review_outcome", label: "Review outcome" },
+];
+
+const DEFAULT_STATUS = STATUS_OPTS.map((s) => s.value);
+const DEFAULT_FIELDS = FIELD_OPTS.map((f) => f.value);
+const DEFAULT_TRIGGERS = ["always", "data_changed", "pending_to_final"];
 
 type Form = {
   name: string;
@@ -40,13 +61,21 @@ const blank: Form = {
   step_selector: "all",
   step_indexes: "",
   step_names: "",
-  output_fields: [...FIELD_OPTS],
-  status_filter: [...STATUS_OPTS],
-  triggers: ["always", "data_changed", "pending_to_final"],
+  output_fields: [...DEFAULT_FIELDS],
+  status_filter: [...DEFAULT_STATUS],
+  triggers: [...DEFAULT_TRIGGERS],
   fetch_final_mail: true,
   priority: 100,
   notes: "",
 };
+
+function statusLabel(code: string): string {
+  return STATUS_OPTS.find((s) => s.value === code)?.label ?? code;
+}
+
+function triggerLabel(code: string): string {
+  return TRIGGER_OPTS.find((t) => t.value === code)?.label ?? code;
+}
 
 export function FeedbackRulesPage() {
   const [rules, setRules] = useState<FeedbackRule[]>([]);
@@ -77,6 +106,14 @@ export function FeedbackRulesPage() {
     });
   }
 
+  function selectAll(key: "output_fields" | "status_filter" | "triggers", values: string[]) {
+    setForm((f) => ({ ...f, [key]: [...values] }));
+  }
+
+  function clearAll(key: "output_fields" | "status_filter" | "triggers") {
+    setForm((f) => ({ ...f, [key]: [] }));
+  }
+
   function startEdit(rule: FeedbackRule) {
     setEditId(rule.id);
     setForm({
@@ -92,13 +129,19 @@ export function FeedbackRulesPage() {
       priority: rule.priority,
       notes: rule.notes || "",
     });
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  function cancelEdit() {
+    setEditId(null);
+    setForm(blank);
   }
 
   async function save() {
     setError("");
     setMsg("");
     if (!form.name.trim()) {
-      setError("请填写规则名称");
+      setError("Please enter a rule name");
       return;
     }
     const payload = {
@@ -124,10 +167,10 @@ export function FeedbackRulesPage() {
     try {
       if (editId) {
         await api.put(`/api/feedback-rules/${editId}`, payload);
-        setMsg("规则已更新");
+        setMsg("Rule updated");
       } else {
         await api.post("/api/feedback-rules", payload);
-        setMsg("规则已创建");
+        setMsg("Rule created");
       }
       setForm(blank);
       setEditId(null);
@@ -140,6 +183,16 @@ export function FeedbackRulesPage() {
   async function remove(id: number) {
     try {
       await api.delete(`/api/feedback-rules/${id}`);
+      if (editId === id) cancelEdit();
+      await load();
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : String(e));
+    }
+  }
+
+  async function toggleEnabled(rule: FeedbackRule, enabled: boolean) {
+    try {
+      await api.put(`/api/feedback-rules/${rule.id}`, { enabled });
       await load();
     } catch (e) {
       setError(e instanceof ApiError ? e.message : String(e));
@@ -147,188 +200,329 @@ export function FeedbackRulesPage() {
   }
 
   return (
-    <div>
-      <h1 className="page-title">Step / 反馈规则</h1>
-      <p className="page-sub">自定义哪些 Step、字段、状态与触发条件参与同步和 Final Mail 抓取（不写死 Step 2）。</p>
+    <div className="page">
+      <header className="page-header">
+        <h1 className="page-title">Step / Feedback Rules</h1>
+        <p className="page-sub">
+          Configure which steps, fields, statuses, and triggers participate in sync and Final Mail
+          fetching (not hard-coded to Step 2).
+        </p>
+      </header>
+
       <Alert type="error">{error}</Alert>
       <Alert type="success">{msg}</Alert>
 
-      <div className="card stack" style={{ marginBottom: "1rem" }}>
-        <h3>{editId ? `编辑规则 #${editId}` : "新建规则"}</h3>
-        <div className="form-grid">
-          <label>
-            名称
-            <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
-          </label>
-          <label>
-            优先级（越小越优先）
-            <input
-              type="number"
-              value={form.priority}
-              onChange={(e) => setForm({ ...form, priority: Number(e.target.value) })}
-            />
-          </label>
-          <label>
-            Step 选择方式
-            <select
-              value={form.step_selector}
-              onChange={(e) => setForm({ ...form, step_selector: e.target.value })}
-            >
-              <option value="all">全部 Step</option>
-              <option value="by_index">按序号</option>
-              <option value="by_name">按名称</option>
-            </select>
-          </label>
-          <label>
-            Step 序号（逗号分隔）
-            <input
-              value={form.step_indexes}
-              onChange={(e) => setForm({ ...form, step_indexes: e.target.value })}
-              placeholder="例如 1,2"
-              disabled={form.step_selector !== "by_index"}
-            />
-          </label>
-          <label>
-            Step 名称（逗号分隔）
-            <input
-              value={form.step_names}
-              onChange={(e) => setForm({ ...form, step_names: e.target.value })}
-              placeholder="例如 Step 2, GDS Review"
-              disabled={form.step_selector !== "by_name"}
-            />
-          </label>
-        </div>
-
-        <div>
-          <div className="muted">输出字段</div>
-          <div className="checkbox-row">
-            {FIELD_OPTS.map((f) => (
-              <label key={f}>
-                <input
-                  type="checkbox"
-                  checked={form.output_fields.includes(f)}
-                  onChange={() => toggleList("output_fields", f)}
-                />
-                {f}
-              </label>
-            ))}
-          </div>
-        </div>
-
-        <div>
-          <div className="muted">状态过滤</div>
-          <div className="checkbox-row">
-            {STATUS_OPTS.map((s) => (
-              <label key={s}>
-                <input
-                  type="checkbox"
-                  checked={form.status_filter.includes(s)}
-                  onChange={() => toggleList("status_filter", s)}
-                />
-                {s}
-              </label>
-            ))}
-          </div>
-        </div>
-
-        <div>
-          <div className="muted">触发条件</div>
-          <div className="checkbox-row">
-            {TRIGGER_OPTS.map((t) => (
-              <label key={t}>
-                <input
-                  type="checkbox"
-                  checked={form.triggers.includes(t)}
-                  onChange={() => toggleList("triggers", t)}
-                />
-                {t}
-              </label>
-            ))}
-          </div>
-        </div>
-
-        <div className="checkbox-row">
-          <label>
-            <input
-              type="checkbox"
-              checked={form.enabled}
-              onChange={(e) => setForm({ ...form, enabled: e.target.checked })}
-            />
-            启用
-          </label>
-          <label>
-            <input
-              type="checkbox"
-              checked={form.fetch_final_mail}
-              onChange={(e) => setForm({ ...form, fetch_final_mail: e.target.checked })}
-            />
-            抓取 Final Mail 评论
-          </label>
-        </div>
-
-        <label>
-          备注
-          <input value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
-        </label>
-
-        <div className="row">
-          <button className="btn" onClick={() => void save()}>
-            {editId ? "更新" : "创建"}
-          </button>
+      <div className="card rule-form">
+        <div className="card-header">
+          <h3>
+            <span className="material-symbols-outlined">{editId ? "edit" : "add_circle"}</span>
+            {editId ? `Edit rule #${editId}` : "New Rule"}
+          </h3>
           {editId && (
-            <button
-              className="btn secondary"
-              onClick={() => {
-                setEditId(null);
-                setForm(blank);
-              }}
-            >
-              取消编辑
+            <button type="button" className="btn sm secondary" onClick={cancelEdit}>
+              <span className="material-symbols-outlined">close</span>
+              Cancel edit
             </button>
           )}
+        </div>
+
+        {/* Basics */}
+        <section className="rule-section">
+          <div className="rule-section-title">Basics</div>
+          <div className="form-grid">
+            <label>
+              Name
+              <input
+                value={form.name}
+                onChange={(e) => setForm({ ...form, name: e.target.value })}
+                placeholder="e.g. Step 2 review sync"
+              />
+            </label>
+            <label>
+              Priority
+              <input
+                type="number"
+                value={form.priority}
+                onChange={(e) => setForm({ ...form, priority: Number(e.target.value) })}
+              />
+              <span className="field-hint">Lower number = higher priority</span>
+            </label>
+            <label>
+              Notes
+              <input
+                value={form.notes}
+                onChange={(e) => setForm({ ...form, notes: e.target.value })}
+                placeholder="Optional"
+              />
+            </label>
+          </div>
+        </section>
+
+        {/* Step selection */}
+        <section className="rule-section">
+          <div className="rule-section-title">Step selection</div>
+          <div className="form-grid">
+            <label>
+              Selector
+              <select
+                value={form.step_selector}
+                onChange={(e) => setForm({ ...form, step_selector: e.target.value })}
+              >
+                <option value="all">All steps</option>
+                <option value="by_index">By index</option>
+                <option value="by_name">By name</option>
+              </select>
+            </label>
+            <label>
+              Step indexes
+              <input
+                value={form.step_indexes}
+                onChange={(e) => setForm({ ...form, step_indexes: e.target.value })}
+                placeholder="e.g. 1,2"
+                disabled={form.step_selector !== "by_index"}
+              />
+              <span className="field-hint">Comma-separated</span>
+            </label>
+            <label>
+              Step names
+              <input
+                value={form.step_names}
+                onChange={(e) => setForm({ ...form, step_names: e.target.value })}
+                placeholder="e.g. Step 2, GDS Review"
+                disabled={form.step_selector !== "by_name"}
+              />
+              <span className="field-hint">Comma-separated</span>
+            </label>
+          </div>
+        </section>
+
+        {/* Output fields */}
+        <section className="rule-section">
+          <div className="rule-section-head">
+            <div className="rule-section-title">Output fields</div>
+            <div className="rule-section-tools">
+              <button
+                type="button"
+                className="btn sm secondary"
+                onClick={() => selectAll("output_fields", DEFAULT_FIELDS)}
+              >
+                Select all
+              </button>
+              <button type="button" className="btn sm secondary" onClick={() => clearAll("output_fields")}>
+                Clear
+              </button>
+            </div>
+          </div>
+          <div className="chip-group option-grid">
+            {FIELD_OPTS.map((f) => (
+              <label key={f.value} className="md-check-chip" title={f.label}>
+                <input
+                  type="checkbox"
+                  checked={form.output_fields.includes(f.value)}
+                  onChange={() => toggleList("output_fields", f.value)}
+                />
+                <span className="chip-text">{f.label}</span>
+              </label>
+            ))}
+          </div>
+        </section>
+
+        {/* Status filter */}
+        <section className="rule-section">
+          <div className="rule-section-head">
+            <div className="rule-section-title">Status filter</div>
+            <div className="rule-section-tools">
+              <button
+                type="button"
+                className="btn sm secondary"
+                onClick={() => selectAll("status_filter", DEFAULT_STATUS)}
+              >
+                Select all
+              </button>
+              <button type="button" className="btn sm secondary" onClick={() => clearAll("status_filter")}>
+                Clear
+              </button>
+            </div>
+          </div>
+          <div className="chip-group option-grid-status status-chips">
+            {STATUS_OPTS.map((s) => (
+              <label key={s.value} className="md-check-chip" title={s.label}>
+                <input
+                  type="checkbox"
+                  checked={form.status_filter.includes(s.value)}
+                  onChange={() => toggleList("status_filter", s.value)}
+                />
+                <span className="chip-text">{s.label}</span>
+              </label>
+            ))}
+          </div>
+        </section>
+
+        {/* Triggers */}
+        <section className="rule-section">
+          <div className="rule-section-head">
+            <div className="rule-section-title">Triggers</div>
+            <div className="rule-section-tools">
+              <button
+                type="button"
+                className="btn sm secondary"
+                onClick={() => selectAll(
+                  "triggers",
+                  TRIGGER_OPTS.map((t) => t.value),
+                )}
+              >
+                Select all
+              </button>
+              <button type="button" className="btn sm secondary" onClick={() => clearAll("triggers")}>
+                Clear
+              </button>
+            </div>
+          </div>
+          <div className="chip-group option-grid-triggers">
+            {TRIGGER_OPTS.map((t) => (
+              <label key={t.value} className="md-check-chip" title={t.label}>
+                <input
+                  type="checkbox"
+                  checked={form.triggers.includes(t.value)}
+                  onChange={() => toggleList("triggers", t.value)}
+                />
+                <span className="chip-text">{t.label}</span>
+              </label>
+            ))}
+          </div>
+        </section>
+
+        {/* Options + actions */}
+        <section className="rule-section rule-section-last">
+          <div className="rule-section-title">Options</div>
+          <div className="switch-group">
+            <Switch
+              checked={form.enabled}
+              onChange={(v) => setForm({ ...form, enabled: v })}
+              label="Enable rule"
+            />
+            <Switch
+              checked={form.fetch_final_mail}
+              onChange={(v) => setForm({ ...form, fetch_final_mail: v })}
+              label="Fetch Final Mail comments"
+            />
+          </div>
+        </section>
+
+        <div className="form-footer">
+          <div className="form-footer-actions">
+            <button type="button" className="btn" onClick={() => void save()}>
+              <span className="material-symbols-outlined">save</span>
+              {editId ? "Update rule" : "Create rule"}
+            </button>
+            {editId ? (
+              <button type="button" className="btn secondary" onClick={cancelEdit}>
+                <span className="material-symbols-outlined">close</span>
+                Cancel
+              </button>
+            ) : (
+              <button type="button" className="btn secondary" onClick={() => setForm(blank)}>
+                <span className="material-symbols-outlined">restart_alt</span>
+                Reset form
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
       <div className="card">
-        <h3>现有规则</h3>
+        <div className="card-header">
+          <h3>
+            <span className="material-symbols-outlined">rule</span>
+            Existing Rules
+          </h3>
+          <span className="badge">{rules.length}</span>
+        </div>
         <div className="table-wrap">
-          <table>
+          <table className="rules-table">
             <thead>
               <tr>
-                <th>名称</th>
+                <th>Name</th>
                 <th>Step</th>
-                <th>触发</th>
-                <th>Mail</th>
-                <th>状态</th>
-                <th></th>
+                <th>Status filter</th>
+                <th>Triggers</th>
+                <th className="center">Mail</th>
+                <th className="center">Enabled</th>
+                <th className="center">Actions</th>
               </tr>
             </thead>
             <tbody>
               {rules.map((r) => (
-                <tr key={r.id}>
+                <tr key={r.id} className={editId === r.id ? "row-editing" : undefined}>
                   <td>
-                    {r.name} <span className="muted">P{r.priority}</span>
+                    <div className="cell-primary">{r.name}</div>
+                    <div className="muted">Priority {r.priority}</div>
                   </td>
                   <td className="mono">
                     {r.step_selector}
                     {r.step_selector === "by_index" ? ` [${r.step_indexes.join(",")}]` : ""}
                     {r.step_selector === "by_name" ? ` [${r.step_names.join(",")}]` : ""}
                   </td>
-                  <td>{r.triggers.join(", ")}</td>
-                  <td>{r.fetch_final_mail ? "是" : "否"}</td>
                   <td>
-                    <span className={`badge ${r.enabled ? "ok" : "warn"}`}>{r.enabled ? "启用" : "停用"}</span>
+                    <div className="cell-tags">
+                      {(r.status_filter || []).map((s) => (
+                        <span key={s} className="badge">
+                          {statusLabel(s)}
+                        </span>
+                      ))}
+                      {(r.status_filter || []).length === 0 && <span className="muted">—</span>}
+                    </div>
                   </td>
-                  <td className="row">
-                    <button className="btn sm secondary" onClick={() => startEdit(r)}>
-                      编辑
-                    </button>
-                    <button className="btn sm danger" onClick={() => void remove(r.id)}>
-                      删除
-                    </button>
+                  <td>
+                    <div className="cell-tags">
+                      {(r.triggers || []).map((t) => (
+                        <span key={t} className="badge">
+                          {triggerLabel(t)}
+                        </span>
+                      ))}
+                    </div>
+                  </td>
+                  <td className="center">
+                    <span className={`badge ${r.fetch_final_mail ? "ok" : "warn"}`}>
+                      {r.fetch_final_mail ? "Yes" : "No"}
+                    </span>
+                  </td>
+                  <td className="center">
+                    <div className="row center">
+                      <Switch checked={r.enabled} onChange={(v) => void toggleEnabled(r, v)} />
+                    </div>
+                  </td>
+                  <td className="center">
+                    <div className="table-actions">
+                      <button
+                        type="button"
+                        className="btn sm secondary"
+                        onClick={() => startEdit(r)}
+                        title="Edit"
+                      >
+                        <span className="material-symbols-outlined">edit</span>
+                        Edit
+                      </button>
+                      <button
+                        type="button"
+                        className="btn sm danger"
+                        onClick={() => void remove(r.id)}
+                        title="Delete"
+                      >
+                        <span className="material-symbols-outlined">delete</span>
+                        Delete
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
+              {rules.length === 0 && (
+                <tr>
+                  <td colSpan={7} className="empty-cell">
+                    No rules yet. Create one above.
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>

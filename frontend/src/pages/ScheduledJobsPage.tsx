@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { api, type ScheduledJob, ApiError } from "../api/client";
 import { Alert } from "../components/Alert";
+import { Switch } from "../components/Switch";
 
 type Form = {
   name: string;
@@ -69,16 +70,16 @@ export function ScheduledJobsPage() {
         timezone: form.timezone,
         job_type: form.job_type,
       });
-      setMsg("定时任务已创建（持久化到数据库，重启后仍有效）");
+      setMsg("Scheduled job created (persisted in DB, survives restarts)");
       await load();
     } catch (e) {
       setError(e instanceof ApiError ? e.message : String(e));
     }
   }
 
-  async function toggle(job: ScheduledJob) {
+  async function toggle(job: ScheduledJob, enabled: boolean) {
     try {
-      await api.put(`/api/scheduled-jobs/${job.id}`, { enabled: !job.enabled });
+      await api.put(`/api/scheduled-jobs/${job.id}`, { enabled });
       await load();
     } catch (e) {
       setError(e instanceof ApiError ? e.message : String(e));
@@ -88,7 +89,7 @@ export function ScheduledJobsPage() {
   async function runNow(id: number) {
     try {
       const res = await api.post<{ run_id: number }>(`/api/scheduled-jobs/${id}/run`);
-      setMsg(`已触发运行 #${res.run_id}`);
+      setMsg(`Triggered run #${res.run_id}`);
     } catch (e) {
       setError(e instanceof ApiError ? e.message : String(e));
     }
@@ -111,45 +112,54 @@ export function ScheduledJobsPage() {
   }
 
   return (
-    <div>
-      <h1 className="page-title">定时任务</h1>
-      <p className="page-sub">支持间隔、每天、按星期、Cron。默认时区 Europe/Belgrade。同一任务不会并发重复运行。</p>
+    <div className="page">
+      <header className="page-header">
+        <h1 className="page-title">Scheduled Jobs</h1>
+        <p className="page-sub">
+          Supports interval, daily, weekly, and Cron schedules. Default timezone is Europe/Belgrade.
+          The same job will not run concurrently.
+        </p>
+      </header>
+
       <Alert type="error">{error}</Alert>
       <Alert type="success">{msg}</Alert>
 
-      <div className="card stack" style={{ marginBottom: "1rem" }}>
-        <h3>新建任务</h3>
+      <div className="card stack">
+        <h3>
+          <span className="material-symbols-outlined">add_alarm</span>
+          New Job
+        </h3>
         <div className="form-grid">
           <label>
-            名称
+            Name
             <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
           </label>
           <label>
-            任务类型
+            Job type
             <select value={form.job_type} onChange={(e) => setForm({ ...form, job_type: e.target.value })}>
-              <option value="pipeline">完整 Pipeline</option>
-              <option value="sync_tracked">同步追踪 Workflow</option>
-              <option value="sync_current">同步 Current</option>
+              <option value="pipeline">Full Pipeline</option>
+              <option value="sync_tracked">Sync Tracked Workflows</option>
+              <option value="sync_current">Sync Current</option>
               <option value="fetch_comments">Final Mail</option>
               <option value="sync_sheets">Google Sheets</option>
             </select>
           </label>
           <label>
-            调度类型
+            Schedule type
             <select
               value={form.schedule_type}
               onChange={(e) => setForm({ ...form, schedule_type: e.target.value })}
             >
-              <option value="interval_minutes">每隔 N 分钟</option>
-              <option value="interval_hours">每隔 N 小时</option>
-              <option value="daily">每天指定时间</option>
-              <option value="weekly">指定星期</option>
-              <option value="cron">Cron 表达式</option>
+              <option value="interval_minutes">Every N minutes</option>
+              <option value="interval_hours">Every N hours</option>
+              <option value="daily">Daily at time</option>
+              <option value="weekly">Weekly on days</option>
+              <option value="cron">Cron expression</option>
             </select>
           </label>
           {(form.schedule_type === "interval_minutes" || form.schedule_type === "interval_hours") && (
             <label>
-              间隔值
+              Interval value
               <input
                 type="number"
                 min={1}
@@ -160,13 +170,13 @@ export function ScheduledJobsPage() {
           )}
           {(form.schedule_type === "daily" || form.schedule_type === "weekly") && (
             <label>
-              时间 (HH:MM)
+              Time (HH:MM)
               <input value={form.daily_time} onChange={(e) => setForm({ ...form, daily_time: e.target.value })} />
             </label>
           )}
           {form.schedule_type === "cron" && (
             <label>
-              Cron（分 时 日 月 周）
+              Cron (min hour day month weekday)
               <input
                 value={form.cron_expression}
                 onChange={(e) => setForm({ ...form, cron_expression: e.target.value })}
@@ -174,48 +184,70 @@ export function ScheduledJobsPage() {
             </label>
           )}
           <label>
-            时区
+            Timezone
             <input value={form.timezone} onChange={(e) => setForm({ ...form, timezone: e.target.value })} />
           </label>
         </div>
+
         {form.schedule_type === "weekly" && (
-          <div className="checkbox-row">
-            {WEEKDAYS.map((d) => (
-              <label key={d.v}>
-                <input type="checkbox" checked={form.weekdays.includes(d.v)} onChange={() => toggleDay(d.v)} />
-                {d.l}
-              </label>
-            ))}
+          <div className="panel-section">
+            <div className="section-label">Weekdays</div>
+            <div className="chip-group">
+              {WEEKDAYS.map((d) => (
+                <label key={d.v} className="md-check-chip">
+                  <input
+                    type="checkbox"
+                    checked={form.weekdays.includes(d.v)}
+                    onChange={() => toggleDay(d.v)}
+                  />
+                  {d.l}
+                </label>
+              ))}
+            </div>
           </div>
         )}
-        <div className="row">
+
+        <div className="switch-group">
+          <Switch
+            checked={form.enabled}
+            onChange={(v) => setForm({ ...form, enabled: v })}
+            label="Enable after create"
+          />
+        </div>
+
+        <div className="actions">
           <button className="btn" onClick={() => void create()}>
-            创建
+            <span className="material-symbols-outlined">add</span>
+            Create
           </button>
         </div>
       </div>
 
       <div className="card">
-        <h3>已保存任务</h3>
+        <div className="card-header">
+          <h3>
+            <span className="material-symbols-outlined">schedule</span>
+            Saved Jobs
+          </h3>
+          <span className="badge">{jobs.length}</span>
+        </div>
         <div className="table-wrap">
           <table>
             <thead>
               <tr>
-                <th>名称</th>
-                <th>调度</th>
-                <th>类型</th>
-                <th>上次运行</th>
-                <th>下次</th>
-                <th></th>
+                <th>Name</th>
+                <th>Schedule</th>
+                <th>Type</th>
+                <th>Last run</th>
+                <th>Next</th>
+                <th className="center">Enabled</th>
+                <th className="center">Actions</th>
               </tr>
             </thead>
             <tbody>
               {jobs.map((j) => (
                 <tr key={j.id}>
-                  <td>
-                    {j.name}{" "}
-                    <span className={`badge ${j.enabled ? "ok" : "warn"}`}>{j.enabled ? "开" : "关"}</span>
-                  </td>
+                  <td>{j.name}</td>
                   <td className="mono">
                     {j.schedule_type}
                     {j.interval_value ? ` ${j.interval_value}` : ""}
@@ -229,23 +261,27 @@ export function ScheduledJobsPage() {
                     {j.last_run_status ? ` (${j.last_run_status})` : ""}
                   </td>
                   <td>{j.next_run_at || "—"}</td>
-                  <td className="row">
-                    <button className="btn sm secondary" onClick={() => void runNow(j.id)}>
-                      立即运行
-                    </button>
-                    <button className="btn sm secondary" onClick={() => void toggle(j)}>
-                      {j.enabled ? "禁用" : "启用"}
-                    </button>
-                    <button className="btn sm danger" onClick={() => void remove(j.id)}>
-                      删除
-                    </button>
+                  <td className="center">
+                    <div className="row center">
+                      <Switch checked={j.enabled} onChange={(v) => void toggle(j, v)} />
+                    </div>
+                  </td>
+                  <td className="center">
+                    <div className="row center">
+                      <button className="btn sm secondary" onClick={() => void runNow(j.id)}>
+                        Run now
+                      </button>
+                      <button className="btn sm danger" onClick={() => void remove(j.id)}>
+                        Delete
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
               {jobs.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="muted">
-                    暂无定时任务
+                  <td colSpan={7} className="empty-cell">
+                    No scheduled jobs
                   </td>
                 </tr>
               )}

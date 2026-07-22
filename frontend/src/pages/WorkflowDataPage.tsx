@@ -8,6 +8,7 @@ import {
   ApiError,
 } from "../api/client";
 import { Alert } from "../components/Alert";
+import { Switch } from "../components/Switch";
 
 export function WorkflowDataPage() {
   const [items, setItems] = useState<Workflow[]>([]);
@@ -53,28 +54,46 @@ export function WorkflowDataPage() {
   }
 
   return (
-    <div>
-      <h1 className="page-title">Workflow 数据</h1>
-      <p className="page-sub">查看已同步的 Workflow、Step 状态与变更历史。共 {total} 条。</p>
+    <div className="page">
+      <header className="page-header">
+        <h1 className="page-title">Workflow Data</h1>
+        <p className="page-sub">
+          Browse synced workflows, step status, and change history. Total: {total}.
+        </p>
+      </header>
+
       <Alert type="error">{error}</Alert>
 
-      <div className="card row" style={{ marginBottom: "1rem" }}>
-        <input
-          placeholder="搜索编号或标题"
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          style={{ minWidth: 220 }}
-        />
-        <label style={{ flexDirection: "row", alignItems: "center" }}>
-          <input type="checkbox" checked={currentOnly} onChange={(e) => setCurrentOnly(e.target.checked)} />
-          仅进行中
-        </label>
-        <button className="btn secondary" onClick={() => void load()}>
-          查询
-        </button>
+      <div className="card">
+        <div className="toolbar">
+          <label>
+            Search
+            <input
+              placeholder="Search by number or title"
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+            />
+          </label>
+          <div className="switch-group" style={{ paddingTop: "1.35rem" }}>
+            <Switch checked={currentOnly} onChange={setCurrentOnly} label="In progress only" />
+          </div>
+          <div style={{ paddingTop: "1.35rem" }}>
+            <button className="btn secondary" onClick={() => void load()}>
+              <span className="material-symbols-outlined">search</span>
+              Search
+            </button>
+          </div>
+        </div>
       </div>
 
-      <div className="card" style={{ marginBottom: "1rem" }}>
+      <div className="card">
+        <div className="card-header">
+          <h3>
+            <span className="material-symbols-outlined">account_tree</span>
+            Workflow List
+          </h3>
+          <span className="badge">{items.length}</span>
+        </div>
         <div className="table-wrap">
           <table>
             <thead>
@@ -82,9 +101,9 @@ export function WorkflowDataPage() {
                 <th>Number</th>
                 <th>Title</th>
                 <th>Status</th>
-                <th>Steps</th>
+                <th className="center">Steps</th>
                 <th>Checked</th>
-                <th></th>
+                <th className="center">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -97,19 +116,19 @@ export function WorkflowDataPage() {
                       {w.review_status || (w.is_completed ? "Completed" : "Open")}
                     </span>
                   </td>
-                  <td>{w.steps?.length ?? 0}</td>
+                  <td className="center">{w.steps?.length ?? 0}</td>
                   <td className="muted mono">{w.last_checked_at || "—"}</td>
-                  <td>
+                  <td className="center">
                     <button className="btn sm secondary" onClick={() => void open(w)}>
-                      详情
+                      Details
                     </button>
                   </td>
                 </tr>
               ))}
               {items.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="muted">
-                    暂无数据，请先在 Dashboard 运行同步。
+                  <td colSpan={6} className="empty-cell">
+                    No data yet. Run a sync from the Dashboard first.
                   </td>
                 </tr>
               )}
@@ -120,12 +139,19 @@ export function WorkflowDataPage() {
 
       {selected && (
         <div className="stack">
-          <div className="card">
-            <h3>
-              {selected.workflow_number} — {selected.workflow_title}
-            </h3>
-            <p className="muted">
-              status={selected.review_status} outcome={selected.review_outcome} source={selected.source}
+          <div className="card stack">
+            <div className="card-header">
+              <h3>
+                <span className="material-symbols-outlined">description</span>
+                {selected.workflow_number} — {selected.workflow_title}
+              </h3>
+              <button className="btn sm secondary" onClick={() => setSelected(null)}>
+                Close
+              </button>
+            </div>
+            <p className="muted" style={{ margin: 0 }}>
+              status={selected.review_status} · outcome={selected.review_outcome} · source=
+              {selected.source}
             </p>
             <div className="table-wrap">
               <table>
@@ -177,14 +203,17 @@ export function WorkflowDataPage() {
           </div>
 
           <div className="card">
-            <h3>变更历史</h3>
+            <h3>
+              <span className="material-symbols-outlined">history</span>
+              Change History
+            </h3>
             <div className="table-wrap">
               <table>
                 <thead>
                   <tr>
-                    <th>时间</th>
-                    <th>类型</th>
-                    <th>摘要</th>
+                    <th>Time</th>
+                    <th>Type</th>
+                    <th>Summary</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -200,8 +229,8 @@ export function WorkflowDataPage() {
                   ))}
                   {history.length === 0 && (
                     <tr>
-                      <td colSpan={3} className="muted">
-                        无历史
+                      <td colSpan={3} className="empty-cell">
+                        No history
                       </td>
                     </tr>
                   )}

@@ -43,7 +43,7 @@ export function GoogleSheetsPage() {
       const data = await api.put<GoogleSheetsSettings>("/api/settings/google-sheets", body);
       setCfg(data);
       setSaJson("");
-      setMsg("Google Sheets 设置已保存");
+      setMsg("Google Sheets settings saved");
     } catch (e) {
       setError(e instanceof ApiError ? e.message : String(e));
     }
@@ -74,92 +74,116 @@ export function GoogleSheetsPage() {
   }
 
   return (
-    <div>
-      <h1 className="page-title">Google Sheets 设置</h1>
-      <p className="page-sub">配置 Spreadsheet、Service Account 与输出列。Service Account JSON 仅后端加密保存。</p>
+    <div className="page">
+      <header className="page-header">
+        <h1 className="page-title">Google Sheets Settings</h1>
+        <p className="page-sub">
+          Configure spreadsheet, service account, and output columns. Service Account JSON is encrypted on
+          the backend only.
+        </p>
+      </header>
+
       <Alert type="error">{error}</Alert>
       <Alert type="success">{msg}</Alert>
 
       <div className="card stack">
+        <h3>
+          <span className="material-symbols-outlined">table_chart</span>
+          Spreadsheet Configuration
+        </h3>
         <div className="form-grid">
           <label>
-            Spreadsheet ID 或 URL
+            Spreadsheet ID or URL
             <input value={spreadsheetId} onChange={(e) => setSpreadsheetId(e.target.value)} />
           </label>
           <label>
-            Sheet 名称
+            Sheet name
             <input value={sheetName} onChange={(e) => setSheetName(e.target.value)} />
           </label>
         </div>
         <label>
           Service Account JSON
           {cfg?.has_service_account
-            ? `（已配置: ${cfg.service_account_email_masked || "***"}）`
-            : "（未配置）"}
+            ? ` (configured: ${cfg.service_account_email_masked || "***"})`
+            : " (not configured)"}
           <textarea
-            placeholder='粘贴完整 JSON，留空则不修改'
+            placeholder="Paste full JSON; leave blank to keep unchanged"
             value={saJson}
             onChange={(e) => setSaJson(e.target.value)}
             style={{ minHeight: 140 }}
           />
         </label>
 
-        <div>
-          <div className="row" style={{ marginBottom: "0.5rem" }}>
-            <h3 style={{ margin: 0 }}>列映射</h3>
-            <button className="btn sm secondary" onClick={addCol}>
-              添加列
-            </button>
-          </div>
-          <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>顺序</th>
-                  <th>字段</th>
-                  <th>列名</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                {columns.map((c, i) => (
-                  <tr key={i}>
-                    <td>
-                      <input
-                        type="number"
-                        style={{ width: 70 }}
-                        value={c.order}
-                        onChange={(e) => updateCol(i, { order: Number(e.target.value) })}
-                      />
-                    </td>
-                    <td>
-                      <input value={c.field} onChange={(e) => updateCol(i, { field: e.target.value })} />
-                    </td>
-                    <td>
-                      <input value={c.header} onChange={(e) => updateCol(i, { header: e.target.value })} />
-                    </td>
-                    <td>
-                      <button className="btn sm danger" onClick={() => removeCol(i)}>
-                        删除
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+        <div className="divider" />
+
+        <div className="card-header">
+          <h3 style={{ margin: 0 }}>
+            <span className="material-symbols-outlined">view_column</span>
+            Column Mapping
+          </h3>
+          <button className="btn sm secondary" onClick={addCol}>
+            <span className="material-symbols-outlined">add</span>
+            Add Column
+          </button>
         </div>
 
-        <div className="row">
+        <div className="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th style={{ width: 90 }}>Order</th>
+                <th>Field</th>
+                <th>Header</th>
+                <th className="center" style={{ width: 100 }}></th>
+              </tr>
+            </thead>
+            <tbody>
+              {columns.map((c, i) => (
+                <tr key={i}>
+                  <td>
+                    <input
+                      type="number"
+                      value={c.order}
+                      onChange={(e) => updateCol(i, { order: Number(e.target.value) })}
+                    />
+                  </td>
+                  <td>
+                    <input value={c.field} onChange={(e) => updateCol(i, { field: e.target.value })} />
+                  </td>
+                  <td>
+                    <input value={c.header} onChange={(e) => updateCol(i, { header: e.target.value })} />
+                  </td>
+                  <td className="center">
+                    <button className="btn sm danger" onClick={() => removeCol(i)}>
+                      Delete
+                    </button>
+                  </td>
+                </tr>
+              ))}
+              {columns.length === 0 && (
+                <tr>
+                  <td colSpan={4} className="empty-cell">
+                    No column mapping yet. Click &quot;Add Column&quot; to start.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="actions">
           <button className="btn" onClick={() => void save()}>
-            保存
+            <span className="material-symbols-outlined">save</span>
+            Save
           </button>
           <button className="btn secondary" onClick={() => void test()}>
-            测试连接
+            <span className="material-symbols-outlined">wifi_tethering</span>
+            Test Connection
           </button>
         </div>
-        <p className="muted">
-          业务唯一键为 Workflow Number + Step。增量同步只更新变化行；写入失败会保留 pending/failed 状态供重试。
+        <p className="muted" style={{ margin: 0 }}>
+          Business key is Workflow Number + Step. Incremental sync only updates changed rows; write failures
+          keep pending/failed status for retry.
         </p>
       </div>
     </div>

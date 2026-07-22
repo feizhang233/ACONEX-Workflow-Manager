@@ -104,7 +104,7 @@ export function AconexSettingsPage() {
       const data = await api.put<AconexSettings>("/api/settings/aconex", body);
       setPublicCfg(data);
       setForm((f) => ({ ...f, client_secret: "", refresh_token: "" }));
-      setMsg("设置已保存（敏感字段已加密存储）");
+      setMsg("Settings saved (sensitive fields are encrypted at rest)");
     } catch (e) {
       setError(e instanceof ApiError ? e.message : String(e));
     }
@@ -118,7 +118,7 @@ export function AconexSettingsPage() {
         `/api/settings/aconex/auth-url?redirect_uri=${encodeURIComponent(form.redirect_uri)}`,
       );
       setAuthUrl(res.authorization_url);
-      setMsg("授权地址已生成");
+      setMsg("Authorization URL generated");
     } catch (e) {
       setError(e instanceof ApiError ? e.message : String(e));
     }
@@ -128,7 +128,7 @@ export function AconexSettingsPage() {
     setError("");
     setMsg("");
     if (!form.authorization_code.trim()) {
-      setError("请输入 Authorization Code");
+      setError("Please enter an Authorization Code");
       return;
     }
     try {
@@ -161,20 +161,30 @@ export function AconexSettingsPage() {
     try {
       const list = await api.get<{ project_id: string; project_name: string }[]>("/api/settings/aconex/projects");
       setProjects(list);
-      setMsg(`获取到 ${list.length} 个 Project`);
+      setMsg(`Loaded ${list.length} project(s)`);
     } catch (e) {
       setError(e instanceof ApiError ? e.message : String(e));
     }
   }
 
   return (
-    <div>
-      <h1 className="page-title">ACONEX 设置</h1>
-      <p className="page-sub">OAuth 与 API 配置。Client Secret / Token 仅后端加密保存，前端只显示掩码。</p>
+    <div className="page">
+      <header className="page-header">
+        <h1 className="page-title">ACONEX Settings</h1>
+        <p className="page-sub">
+          OAuth and API configuration. Client Secret and tokens are encrypted on the backend; the UI only
+          shows masked values.
+        </p>
+      </header>
+
       <Alert type="error">{error}</Alert>
       <Alert type="success">{msg}</Alert>
 
       <div className="card stack">
+        <h3>
+          <span className="material-symbols-outlined">vpn_key</span>
+          OAuth / API Configuration
+        </h3>
         <div className="form-grid">
           <label>
             Authorization URL
@@ -197,11 +207,11 @@ export function AconexSettingsPage() {
             <input value={form.client_id} onChange={(e) => set("client_id", e.target.value)} />
           </label>
           <label>
-            Client Secret {publicCfg?.client_secret_masked ? `(当前: ${publicCfg.client_secret_masked})` : ""}
+            Client Secret {publicCfg?.client_secret_masked ? `(current: ${publicCfg.client_secret_masked})` : ""}
             <input
               type="password"
               autoComplete="new-password"
-              placeholder="留空则不修改"
+              placeholder="Leave blank to keep unchanged"
               value={form.client_secret}
               onChange={(e) => set("client_secret", e.target.value)}
             />
@@ -226,11 +236,12 @@ export function AconexSettingsPage() {
             <input value={form.project_name} onChange={(e) => set("project_name", e.target.value)} />
           </label>
           <label>
-            Refresh Token {publicCfg?.refresh_token_masked ? `(当前: ${publicCfg.refresh_token_masked})` : "未设置"}
+            Refresh Token{" "}
+            {publicCfg?.refresh_token_masked ? `(current: ${publicCfg.refresh_token_masked})` : "(not set)"}
             <input
               type="password"
               autoComplete="new-password"
-              placeholder="可直接粘贴 Refresh Token"
+              placeholder="Paste Refresh Token directly"
               value={form.refresh_token}
               onChange={(e) => set("refresh_token", e.target.value)}
             />
@@ -247,25 +258,29 @@ export function AconexSettingsPage() {
           </label>
         </div>
 
-        <div className="row">
+        <div className="actions">
           <button className="btn" onClick={() => void save()}>
-            保存设置
+            <span className="material-symbols-outlined">save</span>
+            Save Settings
           </button>
           <button className="btn secondary" onClick={() => void genAuthUrl()}>
-            生成授权地址
+            <span className="material-symbols-outlined">link</span>
+            Generate Auth URL
           </button>
           <button className="btn secondary" onClick={() => void testConn()}>
-            测试连接
+            <span className="material-symbols-outlined">wifi_tethering</span>
+            Test Connection
           </button>
           <button className="btn secondary" onClick={() => void loadProjects()}>
-            获取 Projects
+            <span className="material-symbols-outlined">folder_open</span>
+            Load Projects
           </button>
         </div>
 
         {authUrl && (
-          <div>
-            <div className="muted">授权地址（在浏览器打开后复制 code）：</div>
-            <div className="mono" style={{ wordBreak: "break-all" }}>
+          <div className="panel-section">
+            <div className="section-label">Authorization URL (open in browser, then copy the code)</div>
+            <div className="inline-code">
               <a href={authUrl} target="_blank" rel="noreferrer">
                 {authUrl}
               </a>
@@ -273,27 +288,36 @@ export function AconexSettingsPage() {
           </div>
         )}
 
+        <div className="divider" />
+
         <div className="form-grid">
           <label>
             Authorization Code
             <input
               value={form.authorization_code}
               onChange={(e) => set("authorization_code", e.target.value)}
-              placeholder="粘贴浏览器回调中的 code"
+              placeholder="Paste code from browser callback"
             />
           </label>
         </div>
-        <div className="row">
-          <button className="btn" onClick={() => void exchangeCode()}>
-            用 Code 交换 Token
+        <div className="actions">
+          <button className="btn tonal" onClick={() => void exchangeCode()}>
+            <span className="material-symbols-outlined">sync_alt</span>
+            Exchange Code for Token
           </button>
         </div>
 
         {publicCfg && (
-          <div className="muted">
-            Token 状态: access={publicCfg.has_access_token ? "有" : "无"}, refresh=
-            {publicCfg.has_refresh_token ? "有" : "无"}
-            {publicCfg.access_token_masked ? `, access 掩码 ${publicCfg.access_token_masked}` : ""}
+          <div className="meta-pills">
+            <span className={`badge ${publicCfg.has_access_token ? "ok" : "warn"}`}>
+              Access Token: {publicCfg.has_access_token ? "Yes" : "No"}
+            </span>
+            <span className={`badge ${publicCfg.has_refresh_token ? "ok" : "warn"}`}>
+              Refresh Token: {publicCfg.has_refresh_token ? "Yes" : "No"}
+            </span>
+            {publicCfg.access_token_masked && (
+              <span className="muted mono">masked {publicCfg.access_token_masked}</span>
+            )}
           </div>
         )}
 
@@ -304,7 +328,7 @@ export function AconexSettingsPage() {
                 <tr>
                   <th>Project ID</th>
                   <th>Name</th>
-                  <th></th>
+                  <th className="center"></th>
                 </tr>
               </thead>
               <tbody>
@@ -312,7 +336,7 @@ export function AconexSettingsPage() {
                   <tr key={p.project_id}>
                     <td className="mono">{p.project_id}</td>
                     <td>{p.project_name}</td>
-                    <td>
+                    <td className="center">
                       <button
                         className="btn sm secondary"
                         onClick={() => {
@@ -320,7 +344,7 @@ export function AconexSettingsPage() {
                           set("project_name", p.project_name);
                         }}
                       >
-                        选择
+                        Select
                       </button>
                     </td>
                   </tr>
