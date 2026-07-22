@@ -1,0 +1,25 @@
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: sqlite:////app/data/aconex_manager.db
+      CORS_ORIGINS: http://localhost:5173,http://127.0.0.1:5173,http://localhost:3000
+    volumes:
+      - ./data:/app/data
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "5173:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
