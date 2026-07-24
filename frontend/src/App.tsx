@@ -8,12 +8,14 @@ import { FeedbackRulesPage } from "./pages/FeedbackRulesPage";
 import { ScheduledJobsPage } from "./pages/ScheduledJobsPage";
 import { RunHistoryPage } from "./pages/RunHistoryPage";
 import { WorkflowDataPage } from "./pages/WorkflowDataPage";
+import { GuidancePage } from "./pages/GuidancePage";
 
 export default function App() {
   return (
     <Routes>
       <Route element={<Layout />}>
         <Route index element={<DashboardPage />} />
+        <Route path="guidance" element={<GuidancePage />} />
         <Route path="settings/aconex" element={<AconexSettingsPage />} />
         <Route path="settings/google-sheets" element={<GoogleSheetsPage />} />
         <Route path="tracked" element={<TrackedWorkflowsPage />} />

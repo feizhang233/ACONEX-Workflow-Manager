@@ -86,6 +86,20 @@ export function GoogleSheetsPage() {
       <Alert type="error">{error}</Alert>
       <Alert type="success">{msg}</Alert>
 
+      <div className="how-it-works">
+        <div className="how-it-works-title">
+          <span className="material-symbols-outlined">assistant_navigation</span>
+          Connect in this order
+        </div>
+        <div className="mini-flow three">
+          <div><span>1</span><strong>Share the sheet</strong><small>Give the service account Editor access</small></div>
+          <span className="material-symbols-outlined">arrow_forward</span>
+          <div><span>2</span><strong>Paste settings</strong><small>Sheet URL and service account JSON</small></div>
+          <span className="material-symbols-outlined">arrow_forward</span>
+          <div><span>3</span><strong>Save & test</strong><small>Confirm the spreadsheet is reachable</small></div>
+        </div>
+      </div>
+
       <div className="card stack">
         <h3>
           <span className="material-symbols-outlined">table_chart</span>

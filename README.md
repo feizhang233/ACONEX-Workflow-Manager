@@ -53,7 +53,16 @@ docker compose up --build
 ```
 
 - 前端：http://localhost:5173  
-- 后端 API：http://localhost:8000/api/health  
+- 后端健康检查：http://localhost:5173/api/health
+- API 文档：http://localhost:5173/docs
+
+Compose 中的后端只暴露在 Docker 内部网络，并由前端 Nginx 代理 `/api`、`/docs`，
+因此不会再占用宿主机的 `8000` 端口。如果之前因
+`Bind for 0.0.0.0:8000 failed: port is already allocated` 启动失败，可直接重新运行：
+
+```bash
+docker compose up --build
+```
 
 ## ACONEX OAuth 配置
 
@@ -180,4 +189,6 @@ npm run build
 | CRUD | `/api/feedback-rules` | 反馈规则 |
 | CRUD | `/api/scheduled-jobs` | 定时任务 |
 
-完整 OpenAPI：`http://127.0.0.1:8000/docs`
+本地直接运行后端时 OpenAPI：`http://127.0.0.1:8000/docs`
+
+Docker Compose 启动时 OpenAPI：`http://127.0.0.1:5173/docs`

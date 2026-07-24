@@ -180,6 +180,22 @@ export function AconexSettingsPage() {
       <Alert type="error">{error}</Alert>
       <Alert type="success">{msg}</Alert>
 
+      <div className="how-it-works">
+        <div className="how-it-works-title">
+          <span className="material-symbols-outlined">assistant_navigation</span>
+          Connect in this order
+        </div>
+        <div className="mini-flow">
+          <div><span>1</span><strong>Enter credentials</strong><small>Client ID, secret, URLs</small></div>
+          <span className="material-symbols-outlined">arrow_forward</span>
+          <div><span>2</span><strong>Generate auth URL</strong><small>Sign in to Oracle</small></div>
+          <span className="material-symbols-outlined">arrow_forward</span>
+          <div><span>3</span><strong>Exchange the code</strong><small>Paste the callback code</small></div>
+          <span className="material-symbols-outlined">arrow_forward</span>
+          <div><span>4</span><strong>Choose & test</strong><small>Select project, test connection</small></div>
+        </div>
+      </div>
+
       <div className="card stack">
         <h3>
           <span className="material-symbols-outlined">vpn_key</span>

@@ -3,8 +3,11 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    ports:
-      - "8000:8000"
+    # The frontend reaches the API through Docker's internal network.
+    # Do not publish port 8000 on the host: it is commonly used by other
+    # local services and caused `port is already allocated` startup failures.
+    expose:
+      - "8000"
     env_file:
       - .env
     environment:
